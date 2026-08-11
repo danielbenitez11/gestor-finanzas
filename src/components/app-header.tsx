@@ -9,7 +9,7 @@ export function AppHeader({
 }: {
   name: string;
   role?: string | null;
-  activo: "panel" | "automaticos" | "admin" | "cuenta";
+  activo: "panel" | "automaticos" | "deudas" | "admin" | "cuenta";
 }) {
   const enlace = (esteEs: typeof activo) =>
     "rounded-lg px-2.5 py-1.5 text-sm transition-colors " +
@@ -34,6 +34,9 @@ export function AppHeader({
         </Link>
         <Link href="/automaticos" className={enlace("automaticos")}>
           Pagos Automáticos
+        </Link>
+        <Link href="/deudas" className={enlace("deudas")}>
+          Deudas
         </Link>
         {/* Esconder el enlace no es una medida de seguridad, solo de orden: la
             página /admin comprueba el rol por su cuenta en el servidor. */}

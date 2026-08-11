@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -64,6 +65,19 @@ export default async function DashboardPage() {
       }),
       getMonthlySeries(userId),
     ]);
+
+  // Lo pendiente de cobrar o pagar. No entra en el saldo —ese dinero no está—,
+  // pero conviene tenerlo a la vista para no llevarse sorpresas.
+  const deudasVivas = await prisma.debt.findMany({
+    where: { userId },
+    select: { direction: true, amountCents: true, settledCents: true },
+  });
+  const meDeben = deudasVivas
+    .filter((d) => d.direction === "OWED_TO_ME")
+    .reduce((s, d) => s + Math.max(0, d.amountCents - d.settledCents), 0);
+  const debo = deudasVivas
+    .filter((d) => d.direction === "I_OWE")
+    .reduce((s, d) => s + Math.max(0, d.amountCents - d.settledCents), 0);
 
   const balanceCents = balance._sum.amountCents ?? 0;
   const incomeCents = monthIncome._sum.amountCents ?? 0;
@@ -131,6 +145,35 @@ export default async function DashboardPage() {
             )}
           </div>
         </section>
+
+        {/* Aviso de deudas: solo aparece si hay algo pendiente, para no ocupar
+            sitio cuando no viene al caso. */}
+        {(meDeben > 0 || debo > 0) && (
+          <Link
+            href="/deudas"
+            className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+          >
+            {meDeben > 0 && (
+              <span className="text-zinc-500 dark:text-zinc-400">
+                Te deben{" "}
+                <strong className="font-medium text-emerald-600 dark:text-emerald-400">
+                  {formatCents(meDeben)}
+                </strong>
+              </span>
+            )}
+            {debo > 0 && (
+              <span className="text-zinc-500 dark:text-zinc-400">
+                Debes{" "}
+                <strong className="font-medium text-zinc-900 dark:text-zinc-50">
+                  {formatCents(debo)}
+                </strong>
+              </span>
+            )}
+            <span className="ml-auto text-zinc-400 dark:text-zinc-500">
+              No cuenta en el saldo →
+            </span>
+          </Link>
+        )}
 
         {/* Lo que se usa a diario. `items-start` es lo que permite que la
             columna del formulario se quede pegada arriba mientras la lista de

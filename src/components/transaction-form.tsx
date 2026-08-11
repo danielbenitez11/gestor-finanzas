@@ -40,6 +40,12 @@ export function TransactionForm() {
   const [descripcion, setDescripcion] = useState("");
   const [fecha, setFecha] = useState(todayISO());
 
+  // Lo de "me deben parte" va plegado: el 95 % de los gastos no lo necesitan y
+  // no debe estorbar al apuntar una compra normal.
+  const [conDeuda, setConDeuda] = useState(false);
+  const [deudorNombre, setDeudorNombre] = useState("");
+  const [deudorImporte, setDeudorImporte] = useState("");
+
   // Vaciado tras guardar. Se hace durante el renderizado y no en un efecto:
   // es el patrón que documenta React para ajustar estado cuando cambia algo de
   // fuera. React descarta este render a medias y vuelve a empezar con los
@@ -50,6 +56,9 @@ export function TransactionForm() {
     setImporte("");
     setDescripcion("");
     setFecha(todayISO());
+    setConDeuda(false);
+    setDeudorNombre("");
+    setDeudorImporte("");
   }
 
   const etiquetaActual = TABS.find((t) => t.type === type)?.corto ?? "movimiento";
@@ -135,6 +144,61 @@ export function TransactionForm() {
           className={inputClass}
         />
       </label>
+
+      {/* Solo en gastos: en un ingreso o un ajuste no tiene sentido. */}
+      {type === "EXPENSE" &&
+        (conDeuda ? (
+          <div className="mt-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/60">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Me deben parte
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setConDeuda(false);
+                  setDeudorNombre("");
+                  setDeudorImporte("");
+                }}
+                className="text-xs text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+              >
+                Quitar
+              </button>
+            </div>
+
+            <div className="mt-2 grid gap-2">
+              <input
+                name="debtPerson"
+                placeholder="¿Quién? (Marta)"
+                maxLength={60}
+                value={deudorNombre}
+                onChange={(e) => setDeudorNombre(e.target.value)}
+                className={inputClass}
+              />
+              <input
+                name="debtAmount"
+                inputMode="decimal"
+                placeholder="¿Cuánto te debe? (16,00)"
+                value={deudorImporte}
+                onChange={(e) => setDeudorImporte(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+              El gasto entero cuenta en tu saldo. Lo que te deben se apunta
+              aparte y no suma hasta que te lo devuelvan.
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConDeuda(true)}
+            className="mt-3 text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400"
+          >
+            + Me deben parte de esto
+          </button>
+        ))}
 
       {state.error && (
         <p

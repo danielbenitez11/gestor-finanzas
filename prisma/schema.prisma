@@ -28,9 +28,52 @@ model User {
   accounts      Account[]
   transactions  Transaction[]
   recurring     RecurringRule[]
+  debts         Debt[]
 
   @@unique([email])
   @@map("user")
+}
+
+/// Dinero prestado o debido que todavía no ha cambiado de manos.
+///
+/// Una deuda NO es un movimiento: si pagaste 24 € y te deben 16, de tu cuenta
+/// salieron 24 y eso es lo que dice el saldo. Los 16 son una nota aparte.
+/// Solo cuando te los devuelven se crea un movimiento de verdad.
+model Debt {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "OWED_TO_ME" (te deben a ti) | "I_OWE" (tú debes)
+  direction String
+
+  person      String
+  description String
+
+  /// Importe total de la deuda, en céntimos y siempre positivo.
+  /// El signo lo pone la dirección, igual que en los movimientos lo pone el tipo.
+  amountCents Int
+
+  /// Lo ya cobrado o pagado. Lo que queda es amountCents - settledCents.
+  /// Se guarda lo saldado en vez de lo pendiente para no perder nunca el
+  /// importe original: así puedes ver "te devolvió 10 de los 16".
+  settledCents Int @default(0)
+
+  date DateTime
+
+  /// Movimiento del que nació, cuando la deuda se apuntó junto a un gasto.
+  /// Una misma cena puede generar varias deudas, una por comensal.
+  originId String?
+  origin   Transaction? @relation("DebtOrigin", fields: [originId], references: [id], onDelete: SetNull)
+
+  /// Los movimientos de cobro o pago que ha ido generando al saldarse.
+  payments Transaction[] @relation("DebtPayments")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, direction])
+  @@map("debt")
 }
 
 /// Una regla que genera gastos sola: una suscripción (indefinida) o una
@@ -134,6 +177,13 @@ model Transaction {
   /// Es null en los movimientos que metes a mano, y SQLite permite repetir
   /// nulos en un índice único, así que no estorba.
   periodKey String?
+
+  /// Deudas que nacieron de este movimiento (pagaste tú, te deben parte).
+  debtsOriginated Debt[] @relation("DebtOrigin")
+
+  /// Si este movimiento ES el cobro o el pago de una deuda, aquí está.
+  debtId String?
+  debt   Debt?   @relation("DebtPayments", fields: [debtId], references: [id], onDelete: SetNull)
 
   // Cuando añadamos categorías, irán aquí como relación opcional.
 

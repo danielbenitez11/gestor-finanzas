@@ -109,6 +109,30 @@ export async function createTransaction(
   const datos = validarMovimiento(formData);
   if ("error" in datos) return { error: datos.error };
 
+  // Atajo opcional: "he pagado 24 pero me deben 16". La deuda se crea colgada
+  // del gasto en la misma operación, así que o se guardan las dos cosas o
+  // ninguna. Nunca queda un gasto con la nota de la deuda a medias.
+  const deudorNombre = String(formData.get("debtPerson") ?? "").trim();
+  const deudorImporte = String(formData.get("debtAmount") ?? "").trim();
+
+  let deuda: { person: string; amountCents: number } | null = null;
+
+  if (deudorNombre || deudorImporte) {
+    if (datos.type !== "EXPENSE") {
+      return { error: "Lo de «me deben parte» solo tiene sentido en un gasto." };
+    }
+    if (!deudorNombre) return { error: "¿Quién te debe? Escribe un nombre." };
+
+    const cents = parseAmountToCents(deudorImporte);
+    if (cents === null || cents <= 0) {
+      return { error: "Lo que te deben no es un importe válido." };
+    }
+    if (cents > datos.cents) {
+      return { error: "No pueden deberte más de lo que has pagado." };
+    }
+    deuda = { person: deudorNombre, amountCents: cents };
+  }
+
   await prisma.transaction.create({
     data: {
       userId: user.id,
@@ -116,12 +140,29 @@ export async function createTransaction(
       amountCents: toSignedCents(datos.type, datos.cents),
       description: datos.description,
       date: datos.date,
+      ...(deuda
+        ? {
+            debtsOriginated: {
+              create: [
+                {
+                  userId: user.id,
+                  direction: "OWED_TO_ME",
+                  person: deuda.person,
+                  description: datos.description,
+                  amountCents: deuda.amountCents,
+                  date: datos.date,
+                },
+              ],
+            },
+          }
+        : {}),
     },
   });
 
   // Le dice a Next.js que los datos de esa página han cambiado y debe volver a
   // renderizarla. Sin esto seguirías viendo el saldo antiguo.
   revalidatePath("/");
+  revalidatePath("/deudas");
   return { ok: true, resetId: crypto.randomUUID() };
 }
 
