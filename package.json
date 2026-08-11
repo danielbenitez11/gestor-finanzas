@@ -8,9 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "crear-admin": "tsx scripts/create-admin.ts",
+    "migrar-a-turso": "tsx scripts/migrar-a-turso.ts",
     "editar-usuario": "tsx scripts/update-user.ts",
     "db:studio": "prisma studio",
-    "db:sql": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script"
+    "db:sql": "prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
