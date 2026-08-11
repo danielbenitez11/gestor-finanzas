@@ -20,8 +20,13 @@ function crearAdaptador() {
 
   if (tursoUrl) {
     return new PrismaLibSql({
-      url: tursoUrl,
-      authToken: process.env.TURSO_AUTH_TOKEN,
+      // Copiar y pegar la dirección arrastra a veces un espacio o un punto
+      // final. Con el punto, el nombre deja de coincidir con el certificado y
+      // la conexión se corta durante el saludo TLS: el error que sale entonces
+      // ("socket disconnected before secure TLS connection") no menciona el
+      // punto por ningún lado, así que se limpia aquí y nos ahorramos el rato.
+      url: tursoUrl.trim().replace(/\.$/, ""),
+      authToken: process.env.TURSO_AUTH_TOKEN?.trim(),
     });
   }
 
