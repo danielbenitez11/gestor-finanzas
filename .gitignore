@@ -58,3 +58,8 @@ next-env.d.ts
 /.claude/
 /.windsurf/
 /docs/
+
+# Índice local de CodeGraph (base de datos SQLite del grafo del código).
+# Se regenera con `codegraph init`; no tiene sentido versionarlo.
+/.codegraph/
+/.obsidian/
