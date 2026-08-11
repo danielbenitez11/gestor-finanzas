@@ -14,15 +14,23 @@ import { cobrosHasta, esIngreso } from "@/lib/recurring";
 export async function generarCobrosPendientes(userId: string): Promise<number> {
   const reglas = await prisma.recurringRule.findMany({
     where: { userId, active: true },
-    include: { charges: { select: { periodKey: true } } },
+    include: {
+      charges: { select: { periodKey: true } },
+      skips: { select: { periodKey: true } },
+    },
   });
 
   let creados = 0;
 
   for (const regla of reglas) {
-    const yaCobrados = new Set(
-      regla.charges.map((c) => c.periodKey).filter((k): k is string => k !== null),
-    );
+    // "Ya resuelto" incluye dos cosas: lo que existe y lo que el usuario borró
+    // a propósito. Ambas se saltan, así que un cobro borrado no resucita.
+    const yaCobrados = new Set([
+      ...regla.charges
+        .map((c) => c.periodKey)
+        .filter((k): k is string => k !== null),
+      ...regla.skips.map((s) => s.periodKey),
+    ]);
 
     const previstos = cobrosHasta(
       regla.startDate,

@@ -10,6 +10,7 @@ import {
   isTransactionType,
   parseAmountToCents,
   toSignedCents,
+  type TransactionType,
 } from "@/lib/money";
 
 /**
@@ -41,12 +42,23 @@ const MAX_DESCRIPTION = 100;
 /** Un billón de céntimos: tope de cordura para detectar errores de tecleo. */
 const MAX_CENTS = 100_000_000_00;
 
-export async function createTransaction(
-  _prevState: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const user = await requireUser();
+type MovimientoValido = {
+  type: TransactionType;
+  cents: number;
+  description: string;
+  date: Date;
+};
 
+/**
+ * Reglas de validación de un movimiento, en un solo sitio.
+ *
+ * Crear y editar comparten esta función a propósito: si estuvieran duplicadas,
+ * tarde o temprano una se quedaría atrás y podrías guardar editando algo que no
+ * te dejaría crear.
+ */
+function validarMovimiento(
+  formData: FormData,
+): MovimientoValido | { error: string } {
   const type = formData.get("type");
   if (!isTransactionType(type)) {
     return { error: "Tipo de movimiento no válido." };
@@ -85,18 +97,62 @@ export async function createTransaction(
     return { error: "La fecha no es válida." };
   }
 
+  return { type, cents, description, date };
+}
+
+export async function createTransaction(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const user = await requireUser();
+
+  const datos = validarMovimiento(formData);
+  if ("error" in datos) return { error: datos.error };
+
   await prisma.transaction.create({
     data: {
       userId: user.id,
-      type,
-      amountCents: toSignedCents(type, cents),
-      description,
-      date,
+      type: datos.type,
+      amountCents: toSignedCents(datos.type, datos.cents),
+      description: datos.description,
+      date: datos.date,
     },
   });
 
   // Le dice a Next.js que los datos de esa página han cambiado y debe volver a
   // renderizarla. Sin esto seguirías viendo el saldo antiguo.
+  revalidatePath("/");
+  return { ok: true, resetId: crypto.randomUUID() };
+}
+
+export async function updateTransaction(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const user = await requireUser();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Falta el movimiento." };
+
+  // Comprobamos que es suyo ANTES de tocar nada.
+  const existente = await prisma.transaction.findFirst({
+    where: { id, userId: user.id },
+  });
+  if (!existente) return { error: "Ese movimiento no existe." };
+
+  const datos = validarMovimiento(formData);
+  if ("error" in datos) return { error: datos.error };
+
+  await prisma.transaction.update({
+    where: { id: existente.id },
+    data: {
+      type: datos.type,
+      amountCents: toSignedCents(datos.type, datos.cents),
+      description: datos.description,
+      date: datos.date,
+    },
+  });
+
   revalidatePath("/");
   return { ok: true, resetId: crypto.randomUUID() };
 }
@@ -110,9 +166,32 @@ export async function deleteTransaction(formData: FormData) {
   // Filtramos por id Y por userId a la vez. Si alguien manipulase el formulario
   // para enviar el id de un movimiento ajeno, la consulta no encontraría nada
   // en lugar de borrarlo. Nunca borres solo por el id que llega del navegador.
-  await prisma.transaction.deleteMany({
+  const movimiento = await prisma.transaction.findFirst({
     where: { id, userId: user.id },
   });
+  if (!movimiento) return;
+
+  // Si lo había generado una suscripción o financiación, dejamos constancia de
+  // que esta mensualidad concreta no debe volver a crearse. Sin esto, el
+  // generador la recrearía en la siguiente carga y parecería que el botón de
+  // borrar no funciona.
+  if (movimiento.recurringId && movimiento.periodKey) {
+    await prisma.recurringSkip.upsert({
+      where: {
+        recurringId_periodKey: {
+          recurringId: movimiento.recurringId,
+          periodKey: movimiento.periodKey,
+        },
+      },
+      create: {
+        recurringId: movimiento.recurringId,
+        periodKey: movimiento.periodKey,
+      },
+      update: {},
+    });
+  }
+
+  await prisma.transaction.delete({ where: { id: movimiento.id } });
 
   revalidatePath("/");
 }

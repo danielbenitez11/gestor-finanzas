@@ -59,6 +59,8 @@ export default async function DashboardPage() {
         where: { userId },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: 50,
+        // Para poder marcar en la lista cuáles vienen de una regla automática.
+        include: { recurring: { select: { name: true } } },
       }),
       getMonthlySeries(userId),
     ]);

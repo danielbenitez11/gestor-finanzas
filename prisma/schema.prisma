@@ -72,9 +72,29 @@ model RecurringRule {
   updatedAt DateTime @updatedAt
 
   charges Transaction[]
+  skips   RecurringSkip[]
 
   @@index([userId, active])
   @@map("recurring_rule")
+}
+
+/// Mensualidades que el usuario borró a mano y NO deben volver a generarse.
+///
+/// Sin esto, borrar el cobro de Netflix de marzo sería inútil: la regla dice
+/// que en marzo tocaba cobrar, así que al recargar la página se crearía otra
+/// vez. Esta tabla es la memoria de "esta concreta, no".
+model RecurringSkip {
+  id          String        @id @default(cuid())
+  recurringId String
+  recurring   RecurringRule @relation(fields: [recurringId], references: [id], onDelete: Cascade)
+
+  /// Mismo formato que Transaction.periodKey: "2026-08".
+  periodKey String
+
+  createdAt DateTime @default(now())
+
+  @@unique([recurringId, periodKey])
+  @@map("recurring_skip")
 }
 
 /// Un movimiento de dinero: ingreso, gasto o ajuste de saldo.
