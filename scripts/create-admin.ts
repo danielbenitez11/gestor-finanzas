@@ -42,6 +42,13 @@ async function main() {
   const password = passwordArg || generatePassword();
   const name = nameArg || email.split("@")[0];
 
+  if (passwordArg) {
+    console.warn(
+      "\n  Aviso: la contraseña que has escrito queda guardada en el historial\n" +
+        "  de la terminal. Si prefieres evitarlo, omítela y se generará una al azar.",
+    );
+  }
+
   const seedAuth = betterAuth({
     database: prismaAdapter(prisma, { provider: "sqlite" }),
     emailAndPassword: { enabled: true },

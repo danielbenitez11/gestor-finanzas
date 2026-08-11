@@ -229,6 +229,23 @@ model Account {
   @@map("account")
 }
 
+/// Contador de intentos por IP y ruta que usa Better Auth para frenar los
+/// ataques de fuerza bruta contra el login.
+///
+/// Por defecto ese contador vive en la memoria del proceso, y eso en un
+/// servidor sin estado como Vercel no sirve: cada petición puede caer en una
+/// instancia distinta con su propio contador a cero, así que el límite nunca
+/// llegaría a saltar. Guardándolo en la base de datos, el límite es real.
+model RateLimit {
+  id          String @id @default(cuid())
+  key         String @unique
+  count       Int
+  /// Marca de tiempo en milisegundos: no cabe en un Int de 32 bits.
+  lastRequest BigInt
+
+  @@map("rate_limit")
+}
+
 model Verification {
   id         String   @id
   identifier String

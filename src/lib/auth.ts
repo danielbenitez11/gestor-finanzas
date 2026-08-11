@@ -16,6 +16,14 @@ export const auth = betterAuth({
     disableSignUp: true,
   },
 
+  rateLimit: {
+    // Frena los ataques de fuerza bruta: Better Auth limita /sign-in/email a 3
+    // intentos cada 10 segundos. El contador se guarda en la base de datos y no
+    // en memoria porque en producción hay varias instancias del servidor, y una
+    // cuenta en memoria por instancia no limita nada.
+    storage: "database",
+  },
+
   plugins: [
     // Añade roles (admin/user) y las operaciones de gestión de usuarios.
     admin(),

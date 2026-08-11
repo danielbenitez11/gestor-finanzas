@@ -78,6 +78,10 @@ async function main() {
   }
 
   if (newPassword) {
+    console.warn(
+      "\n  Aviso: la contraseña queda guardada en el historial de la terminal.\n" +
+        "  Para cambiarla sin ese rastro, usa la página «Mi cuenta» de la aplicación.",
+    );
     if (newPassword.length < 8) {
       console.error("La contraseña debe tener al menos 8 caracteres.");
       process.exit(1);
