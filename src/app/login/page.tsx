@@ -5,6 +5,27 @@ import { useRouter } from "next/navigation";
 
 import { signIn } from "@/lib/auth-client";
 
+/**
+ * Traduce el fallo del login a algo que se pueda leer.
+ *
+ * Decir "ese correo no existe" ayudaría a alguien a averiguar qué cuentas hay
+ * dadas de alta, así que las credenciales incorrectas siguen dando un mensaje
+ * genérico. Pero un servidor caído NO es una contraseña equivocada: mostrar lo
+ * mismo en los dos casos manda a buscar el fallo donde no está.
+ */
+function mensajeDeError(status: number | undefined): string {
+  if (status === 429) {
+    return "Demasiados intentos seguidos. Espera unos segundos y vuelve a probar.";
+  }
+
+  // 0 o indefinido: la petición ni siquiera llegó a salir.
+  if (!status || status >= 500) {
+    return "El servidor no responde. No es tu contraseña: vuelve a intentarlo en un momento.";
+  }
+
+  return "Correo o contraseña incorrectos.";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -20,9 +41,9 @@ export default function LoginPage() {
     const { error: signInError } = await signIn.email({ email, password });
 
     if (signInError) {
-      // Mensaje genérico a propósito: decir "ese correo no existe" ayudaría a
-      // alguien a averiguar qué cuentas hay dadas de alta.
-      setError("Correo o contraseña incorrectos.");
+      // El detalle solo a la consola del navegador: en pantalla, lo justo.
+      console.error("Fallo al entrar:", signInError);
+      setError(mensajeDeError(signInError.status));
       setLoading(false);
       return;
     }
