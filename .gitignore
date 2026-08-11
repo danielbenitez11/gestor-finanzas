@@ -39,3 +39,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# base de datos local (contiene datos personales)
+*.db
+*.db-journal
+*.sqlite
+
+# Documentación para asistentes de IA que instala `prisma init`. Se descarga de
+# github.com/prisma/skills y se restaura desde skills-lock.json, igual que
+# node_modules se restaura desde package-lock.json.
+# .claude y .windsurf son enlaces (junctions) a .agents: git guardaría el mismo
+# contenido tres veces.
+/.agents/
+/.claude/
+/.windsurf/

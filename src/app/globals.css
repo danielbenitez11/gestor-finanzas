@@ -12,10 +12,46 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Colores de los gráficos.
+   Van como variables CSS y no como valores fijos en el JavaScript para que el
+   tema oscuro funcione solo: los atributos fill y stroke de un SVG aceptan
+   var(), así que basta con redefinirlas más abajo.
+
+   Los dos colores de serie salen de una paleta validada: separación de color
+   ΔE 24.7 en claro y 26.8 en oscuro para daltonismo (el mínimo exigible es 8).
+   Por eso ingresos NO es verde y gastos NO es rojo: esa pareja es justo la que
+   no distingue el daltonismo rojo-verde, el más frecuente. */
+:root {
+  /* serie-1 = azul (ingresos y saldo) · serie-2 = naranja (gastos).
+     El color va pegado al concepto, no a la posición: los ingresos son azules
+     en todos los gráficos, salga la serie donde salga. */
+  --chart-serie-1: #2a78d6;
+  --chart-serie-2: #eb6834;
+  --chart-rejilla: #e1e0d9;
+  --chart-eje: #c3c2b7;
+  --chart-texto: #898781;
+  --chart-superficie: #ffffff;
+
+  /* Color de alarma. Es fijo en los dos temas a propósito: un color de estado
+     significa siempre lo mismo, y este contrasta de sobra sobre ambos fondos
+     (4,68:1 en claro y 3,62:1 en oscuro). No es un color de serie: nunca debe
+     usarse para pintar datos, solo para avisar. */
+  --estado-critico: #d03b3b;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    /* Los mismos tonos, ajustados para la superficie oscura. No es una
+       inversión automática: son pasos elegidos y validados para este fondo. */
+    --chart-serie-1: #3987e5;
+    --chart-serie-2: #d95926;
+    --chart-rejilla: #2c2c2a;
+    --chart-eje: #383835;
+    --chart-texto: #898781;
+    --chart-superficie: #18181b;
   }
 }
 

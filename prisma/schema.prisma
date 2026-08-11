@@ -1,0 +1,172 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          String?
+  banned        Boolean?  @default(false)
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+  transactions  Transaction[]
+  recurring     RecurringRule[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+/// Una regla que genera gastos sola: una suscripción (indefinida) o una
+/// financiación (con un número fijo de cuotas). La regla no es un movimiento:
+/// es la receta que va creando movimientos mes a mes.
+model RecurringRule {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "SUBSCRIPTION" (no termina) | "LOAN" (termina al pagar la última cuota)
+  kind String
+
+  name String
+
+  /// Lo que se cobra cada mes, en céntimos y siempre positivo.
+  /// El signo negativo se pone al crear el movimiento, como en el resto de gastos.
+  amountCents Int
+
+  /// Día del mes en que se cobra (1-31). Si el mes no llega a ese día
+  /// (día 31 en febrero), se cobra el último día del mes.
+  dayOfMonth Int
+
+  /// Fecha del primer cobro. Si es anterior a hoy, se generan los atrasados.
+  startDate DateTime
+
+  /// Solo financiaciones: número total de cuotas. null en suscripciones.
+  totalInstallments Int?
+  /// Solo financiaciones: importe financiado, guardado para poder mostrar
+  /// cuánto queda por pagar y cuánto se paga de intereses.
+  principalCents Int?
+  /// TIN en puntos básicos (5,25 % se guarda como 525) para no usar decimales.
+  annualRateBp Int?
+
+  active      Boolean   @default(true)
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  charges Transaction[]
+
+  @@index([userId, active])
+  @@map("recurring_rule")
+}
+
+/// Un movimiento de dinero: ingreso, gasto o ajuste de saldo.
+/// Las finanzas de cada usuario son privadas: todo se filtra por userId.
+model Transaction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "INCOME" (ingreso) | "EXPENSE" (gasto) | "ADJUSTMENT" (ajuste de saldo).
+  /// SQLite no admite enums en Prisma, por eso es texto. El tipo real vive en
+  /// src/lib/transactions.ts para que TypeScript nos avise si escribimos otro valor.
+  type String
+
+  /// Importe en CÉNTIMOS y CON SIGNO: los ingresos suman, los gastos restan.
+  /// 25,50 € de gasto se guarda como -2550. Así el saldo es una simple suma.
+  /// Nunca decimales: 0.1 + 0.2 no da 0.3 en coma flotante y se perderían céntimos.
+  amountCents Int
+
+  description String
+  /// Fecha del movimiento según el usuario, distinta de createdAt (cuándo se registró).
+  date        DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Si el movimiento lo generó una suscripción o financiación, aquí está la
+  /// regla. onDelete: SetNull -> si borras la regla, lo ya cobrado se queda en
+  /// el histórico como un movimiento normal. Lo pagado, pagado está.
+  recurringId String?
+  recurring   RecurringRule? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+
+  /// Mes al que corresponde el cobro, con formato "2026-08".
+  /// Junto con recurringId forma una restricción de unicidad: la base de datos
+  /// hace IMPOSIBLE cobrar dos veces la misma mensualidad, aunque recargues la
+  /// página cien veces o dos pestañas lo intenten a la vez.
+  /// Es null en los movimientos que metes a mano, y SQLite permite repetir
+  /// nulos en un índice único, así que no estorba.
+  periodKey String?
+
+  // Cuando añadamos categorías, irán aquí como relación opcional.
+
+  @@unique([recurringId, periodKey])
+  @@index([userId, date])
+  @@map("transaction")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
